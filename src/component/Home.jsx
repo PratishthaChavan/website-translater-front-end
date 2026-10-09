@@ -1,11 +1,18 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import ImageTranslater from "./ImageTranslater";
 import SendWebLink from "./SendWebLink";
 
 export default function Home() {
 
-    const [activeTab, setActiveTab] = useState("image");
-
+    const [activeTab, setActiveTab] = useState(
+        () => localStorage.getItem("activeTranslator") || "url"
+    );
+    useEffect(() => {
+        localStorage.setItem(
+            "activeTranslator",
+            activeTab
+        );
+    }, [activeTab]);
     return (
         <div className="min-h-screen bg-black text-white">
 
@@ -89,13 +96,13 @@ export default function Home() {
 
 
                     {/* Tab content */}
-                    {activeTab === "image" && (
-                        <ImageTranslater />
-                    )}
-
-                    {activeTab === "url" && (
+                   <div className={activeTab === "url" ? "block" : "hidden"}>
                         <SendWebLink />
-                    )}
+                    </div>
+
+                    <div className={activeTab === "image" ? "block" : "hidden"}>
+                        <ImageTranslater />
+                    </div>
 
                 </div>
 

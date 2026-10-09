@@ -1,10 +1,11 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState,useEffect } from "react";
 import axios from "axios";
+import api, { API_URL } from "../api/axios";
 import ImageTranslater from "./ImageTranslater";
 export default function SendWebLink() {
     const [url, setUrl] = useState("");
     const [targetLanguage, setTargetLanguage] = useState("en");
-    
+
     const [chapterData, setChapterData] = useState({
         title: "",
         manga_name: "",
@@ -16,7 +17,78 @@ export default function SendWebLink() {
     const [error, setError] = useState("");
 
     const eventSourceRef = useRef(null);
+    const connectToJob = (jobId) => {
 
+        const eventSource = new EventSource(
+            `${API_URL}/translate/stream/${jobId}`
+        );
+
+        eventSource.addEventListener(
+            "page",
+            (event) => {
+
+                const page = JSON.parse(
+                    event.data
+                );
+
+                console.log(
+                    "Page received:",
+                    page
+                );
+
+                setChapterData((prev) => ({
+                    ...prev,
+                    pages: [
+                        ...prev.pages,
+                        page
+                    ]
+                }));
+            }
+        );
+
+        eventSource.addEventListener(
+            "complete",
+            () => {
+
+                setStatus("completed");
+
+                localStorage.removeItem(
+                    "urlTranslatorJobId"
+                );
+
+                eventSource.close();
+            }
+        );
+
+        eventSource.onerror = () => {
+            console.log(
+                "SSE connection closed"
+            );
+
+            eventSource.close();
+        };
+
+        return eventSource;
+    };
+    useEffect(() => {
+
+        const savedJobId =
+            localStorage.getItem(
+                "urlTranslatorJobId"
+            );
+
+        if (!savedJobId) {
+            return;
+        }
+
+        console.log(
+            "Restoring job:",
+            savedJobId
+        );
+
+        connectToJob(savedJobId);
+
+    }, []);
     const handleSendLink = async () => {
         if (!url.trim()) {
             setError("Please enter a webpage URL.");
@@ -39,8 +111,8 @@ export default function SendWebLink() {
 
             setStatus("starting");
 
-            const resp = await axios.post(
-                "http://localhost:8000/scraper",
+            const resp = await api.post(
+                "/scraper",
                 {
                     url: url.trim(),
                     target_language: targetLanguage
@@ -49,13 +121,16 @@ export default function SendWebLink() {
             );
 
             const jobId = resp.data.job_id;
-
+            localStorage.setItem(
+                "urlTranslatorJobId",
+                jobId
+            );
             console.log("Current Job ID:", jobId);
 
             setStatus("translating");
 
             const eventSource = new EventSource(
-                `http://localhost:8000/translate/stream/${jobId}`
+                `${API_URL}/translate/stream/${jobId}`
             );
 
             eventSourceRef.current = eventSource;
@@ -407,7 +482,7 @@ export default function SendWebLink() {
         {chapterData.pages.map((page) => (
             <img
                 key={page.page}
-                src={`http://localhost:8000${page.url}`}
+                src={page.url}
                 alt={`Translated manga page ${page.page}`}
                 className="block w-full"
             />
